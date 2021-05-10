@@ -58,10 +58,23 @@ second_dose_queue = [
 
 intervals = []
 
+output_file_name = "average_sim_output.csv"
+
+csv_output = open(output_file_name, 'w', newline='')
+csv_writer = csv.writer(csv_output)
+csv_writer.writerow(
+    ['Day', 'Cum. First Doses', 'Cum. Second Doses', 'New First Doses', 'New Second Doses', 'Second Dose Queue',
+     'Total Second Doses Given'])
+csv_writer.writerow(
+        [0, cum_doses[0][0], cum_doses[0][1], "", "", total_groups_people(second_dose_queue),
+         total_groups_people(intervals)])
+
+
 for day in range(1, len(cum_doses)):
 
     new_first_doses = cum_doses[day][0] - cum_doses[day - 1][0]
     new_second_doses = cum_doses[day][1] - cum_doses[day - 1][1]
+    print(new_second_doses)
 
     # register first doses
     second_dose_queue.append(
@@ -69,25 +82,34 @@ for day in range(1, len(cum_doses)):
     )
 
     # register second doses
+    second_doses_remaining = new_second_doses
+
     for group in second_dose_queue:
-        second_doses_given = min(group.no_people, new_second_doses)
+        second_doses_given = min(group.no_people, second_doses_remaining)
 
         dose_interval = day - group.value
 
         # only count the last 30 days
-        if len(cum_doses) - day < include_past_days:
-            intervals.append(GroupVar(second_doses_given, dose_interval))
+        # if len(cum_doses) - day < include_past_days:
+
+        intervals.append(GroupVar(second_doses_given, dose_interval))
 
         group.no_people -= second_doses_given
-        new_second_doses -= second_doses_given
+        second_doses_remaining -= second_doses_given
 
         if group.no_people == 0:
             second_dose_queue.remove(group)
 
-        if new_second_doses == 0:
+        if second_doses_remaining == 0:
             break
+    csv_writer.writerow(
+        [day, cum_doses[day][0], cum_doses[day][1], new_first_doses, new_second_doses, total_groups_people(second_dose_queue),
+         total_groups_people(intervals)])
+
+csv_output.close()
 
 print(group_average(intervals))
 print(f"Total people given second dose: {total_groups_people(intervals)}")
+
 print("\nThese people are still waiting to be vaccinated right now:")
 print(second_dose_queue)
