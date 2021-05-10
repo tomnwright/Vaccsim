@@ -1,68 +1,94 @@
-population = 53_700_000
-received_first = 35_371_669
-received_second = 17_669_379
-
-daily_capacity = 500_000  # daily dosage capacity
-dose_interval_days = 76
+from utils import *
 
 
-def simulate_day():
-    global received_first
-    global received_second
-    global second_queue
+class VaccineProgramme:
+    def __init__(self, population=53_700_000, received_first=35_371_669,
+                 received_second=17_669_379, daily_capacity=500_000,
+                 dose_interval_days=76):
+        """
+        Simulation of UK vaccine programme
+        :param population: Total number of people that are eligible to be vaccinated
+        :param received_first: Number of people that have already received a first dose of vaccine
+        :param received_second: Number of people that have already received a second dose of vaccine
+        :param daily_capacity: Total number of doses that can be given, daily
+        :param dose_interval_days: Minimum interval between first and second dose (days)
+        """
+        self.population = population
+        self.received_first = received_first
+        self.received_second = received_second
+        self.daily_capacity = daily_capacity
+        self.dose_interval_days = dose_interval_days
 
-    doses_left = daily_capacity
+        self.day = None
+        self.second_queue = None
 
-    # first do outstanding second doses
-    for e, q in enumerate(second_queue):
-        due_day, people = q
+    def simulate_day(self):
 
-        if due_day > day:
-            break
+        doses_left = self.daily_capacity
 
-        # do doses
-        second_doses_given = min(people, doses_left)
+        # first do outstanding second doses
+        for group in self.second_queue:
 
-        people -= second_doses_given
-        doses_left -= second_doses_given
+            people, due_day = group.no_people, group.value
 
-        received_second += second_doses_given
+            if due_day > self.day:
+                break
 
-        if people == 0:
-            del second_queue[e]
-            continue
+            # do doses
+            second_doses_given = min(people, doses_left)
 
-        # then doses_left=0 - we ran out of doses
+            group.no_people -= second_doses_given
+            doses_left -= second_doses_given
 
-        second_queue[e][1] = people
-        break
-    # end of second doses
+            self.received_second += second_doses_given
 
-    # then do first doses
-    first_doses_given = min(population-received_second, doses_left)
+            if group.no_people == 0:
+                self.second_queue.remove(group)
+                continue
 
-    received_first += first_doses_given
-    second_queue.append([day + dose_interval_days, first_doses_given])
-    # end of first doses
+            if doses_left == 0:
+                # ran out of doses
+                break
+        # end of second doses
+
+        # then do first doses
+        first_doses_given = min(self.population - self.received_second, doses_left)
+
+        self.received_first += first_doses_given
+        self.second_queue.append(GroupVar(first_doses_given, self.day + self.dose_interval_days))
+        # end of first doses
+
+    def run_simulation(self):
+
+        self.day = 0
+        self.second_queue = []  # stores list of lists, with element [due_day, number of people]
+
+        # estimate distribution of second queue
+        waiting_for_second = self.received_first - self.received_second
+
+        # stores groups of people, each with value: second dose due day
+        self.second_queue = [
+            GroupVar(int(waiting_for_second / self.dose_interval_days), i)
+            for i in range(self.dose_interval_days)
+        ]
+
+        while self.received_first < self.population:
+            self.simulate_day()
+            self.day += 1
+
+        first_doses_done_on = self.day
+
+        while self.received_second < self.population:
+            self.simulate_day()
+            self.day += 1
+
+        second_doses_done_on = self.day
+
+        return first_doses_done_on, second_doses_done_on
 
 
-day = 0
-second_queue = []  # stores list of lists, with element [due_day, number of people]
+if __name__ == '__main__':
+    vax = VaccineProgramme()
+    first, second = vax.run_simulation()
 
-# estimate distribution of second queue
-wait_second = received_first - received_second
-
-for i in range(dose_interval_days):
-    second_queue.append([i, int(wait_second / dose_interval_days)])
-
-while received_first < population:
-    simulate_day()
-    day += 1
-
-print(f"First doses given after {day} days")
-
-while received_second < population:
-    simulate_day()
-    day += 1
-
-print(f"Second doses given after {day} days")
+    print(f"All first doses given by day {first}\nAll second doses given by day {second}")
