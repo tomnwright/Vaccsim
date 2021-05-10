@@ -1,0 +1,3 @@
+Ideas
+- Randomize vaccine supply based on average and std dev in the last 30 days
+- 
